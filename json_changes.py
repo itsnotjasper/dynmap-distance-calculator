@@ -13,7 +13,10 @@ output = ".\\json\\"+str(int(datetime.datetime.now(datetime.UTC).timestamp()))+"
 def fetchJson(url, output):
     headers = {"Accept": "application/json, */*;q=0.1"}
     request = Request(url, headers=headers)
-    response = urlopen(request)
+    try:
+        response = urlopen(request)
+    except:
+        response = urlopen(url, context=ssl._create_unverified_context())
     data = json.loads(response.read().decode("utf-8"))
     return data
 
