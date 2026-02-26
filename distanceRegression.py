@@ -66,7 +66,8 @@ class PathTraverse:
         best_proj = None
 
         for i in range(len(self.x) - 1):
-            print(f"Now checking segment {i}:")
+            if self.verbose:
+                print(f"Now checking segment {i}:")
             (x1, y1, z1), (x2, y2, z2), (dx, dy, dz) = self._get_seg_info(i)
             if self.vertical:
                 if (px < min(x1, x2) - best_dist or px > max(x1, x2)+best_dist or pz < min(z1, z2) or pz > max(z1, z2)+best_dist or py < min(y1, y2) or py > max(y1, y2)+best_dist):
@@ -108,7 +109,8 @@ class PathTraverse:
                     dist = (px-projx)**2+(pz-projz)**2
 
             if dist < best_dist:
-                print(f"Better segment found: segment {i}")
+                if self.verbose:
+                    print(f"Better segment found: segment {i}")
                 best_dist = dist
                 best_segment = i
                 best_t = t
