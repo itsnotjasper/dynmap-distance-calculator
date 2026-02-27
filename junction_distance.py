@@ -14,14 +14,27 @@ from json_changes import fetchJson, updateJson
 from distanceRegression import PathTraverse
 from merge_paths import merge_paths
 
-def getOptions(search, data):
-    options = []
-    for i in data['roads.a']['lines']:
-        options.append(i)
-    for j in data['roads.b']['lines']:
-        options.append(j)
-    matches = [road for road in options if search.lower() in road.lower()]
-    return sorted(matches) if matches else [f"No matches for {search}"]
+lineDict = {"A": "Arctic", "B": "Beach", "C": "Circle", "D": "Desert", "E": "Eastern", "F": "Forest", 
+"G": "Garden", "H": "Savannah", "I": "Island", "J": "Jungle", "K": "Knight", "L": "Lakeshore", 
+"M": "Mesa", "N": "Northern", "O": "Oasis", "P": "Plains", "Q": "", "R": "Rose", "S": "Southern", "T": "Taiga",
+"U": "Union", "V": "Valley", "W": "Western", "X": "Expo", "Y": "Yeti", "Z": "Zephyr"}
+
+def getOptions(search, data, MRTQuery:bool, MRTline=None):
+    if not MRTQuery:
+        options = []
+        for i in data['roads.a']['lines']:
+            options.append(i)
+        for j in data['roads.b']['lines']:
+            options.append(j)
+        matches = [match for match in options if search.lower() in match.lower()]
+        return sorted(matches) if matches else [f"No matches for {search}"]
+    else:
+        options = []
+        # print(data[lineDict[MRTline].lower()]['lines'])
+        for i in data[lineDict[MRTline].lower()]['lines']:
+            options.append(i)
+        return sorted(options)
+
 
 def selector(stdscr, options, data):
     curses.curs_set(0)  
@@ -93,44 +106,145 @@ def selector(stdscr, options, data):
             return None
 
 
-
 def main(argv: Optional[list[str]] = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("road", help="Road Number")
+    parser.add_argument("ident", help="Road Number / 'MRT' for MRT lines")
     parser.add_argument("-f", "--fetch", "--force", action="store_true", help="Force fetch new JSON data")
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
     parser.add_argument("-y", "--vertical", action="store_true", help="Takes into consideration y-axis")
     args = parser.parse_args(argv)
-    newJson = updateJson(force=args.fetch, verbose=args.verbose)
-    with open(newJson, 'r') as f:
-        data = json.load(f)
+    if args.ident.upper() != "MRT":  
+        newJson = updateJson(False, force=args.fetch, verbose=args.verbose)
+        with open(newJson, 'r') as f:
+            data = json.load(f)
 
-    options = getOptions(args.road, data)
-    if not options:
-        print(f"No options for search {args.road}")
-        return
-    
-    selectedI = curses.wrapper(selector, options, data)
-    if selectedI is None:
-        print("Selection cancelled")
-    elif selectedI:
-        markerList = []
-        for i in selectedI:
+        options = getOptions(args.ident, data, False)
+        if not options:
+            print(f"No options for search {args.ident}")
+            return
+        
+        selectedI = curses.wrapper(selector, options, data)
+        if selectedI is None:
+            print("Selection cancelled")
+        elif selectedI:
+            markerList = []
+            for i in selectedI:
+                if args.verbose:
+                    print(f"{options[i]} indexing")
+                try:
+                    markerList.append((data['roads.a']['lines'][options[i]]['x'], data['roads.a']['lines'][options[i]]['y'], data['roads.a']['lines'][options[i]]['z']))
+                    # print(data['roads.a']['lines'][options[i]]['x'])
+                    # print(markerList)
+                except:
+                    markerList.append((data['roads.b']['lines'][options[i]]['x'], data['roads.b']['lines'][options[i]]['y'], data['roads.b']['lines'][options[i]]['z']))
+                    # print(data['roads.b']['lines'][options[i]]['x'])
+                    # print(markerList)
+            merged_x, merged_y, merged_z = merge_paths(markerList, args.verbose)
+            path = PathTraverse(merged_x, merged_y, merged_z, args.verbose, args.vertical)
+            valid = False
+            while not valid:
+                print("Do you want to use custom junctions (start/end)? (Y/N) \n")
+                ans = input("").upper()
+                if ans == "Y" or ans == "N":
+                    valid = True
+                else:
+                    print("Invalid response")
+                    time.sleep(0.3)
+
+            if ans == "Y":
+                valid = False
+                while not valid:
+                    print(f"Please enter coordinates of measured start in the format (x, y, z), or leave blank to start at first marker at ({merged_x[0]}, {merged_y[0]}, {merged_z[0]}). \n")
+                    start = input("").strip()
+                    if start == "":
+                        valid = True
+                    else:
+                        parts = start.replace(',', ' ').split()
+                        if len(parts) != 3:
+                            print("Invalid coordinates")
+                            time.sleep(0.3)
+                            continue
+                        try:
+                            xStart, yStart, zStart = map(float, parts)
+                            valid = True
+                        except:
+                            print("Invalid coordinates")
+                            time.sleep(0.3)
+                if start == "":
+                    xStart = merged_x[0]
+                    yStart = merged_y[0]
+                    zStart = merged_z[0]
+                valid = False
+                while not valid:
+                    print(f"Please enter coordinates of measured end in the format (x, y, z), or leave blank to end at last marker at ({merged_x[-1]}, {merged_y[-1]}, {merged_z[-1]}). \n")
+                    end = input("").strip()
+                    if end == "":
+                        valid = True
+                    else:
+                        parts2 = end.replace(',', ' ').split()
+                        if len(parts2) != 3:
+                            print("Invalid coordinates")
+                            time.sleep(0.3)
+                            continue
+                        try:
+                            xEnd, yEnd, zEnd = map(float, parts2)
+                            valid = True
+                        except:
+                            print("Invalid coordinates")
+                            time.sleep(0.3)
+                if end == "":
+                    xEnd = merged_x[-1]
+                    yEnd = merged_y[-1]
+                    zEnd = merged_z[-1]
+            if ans == "N":
+                xStart = merged_x[0]
+                yStart = merged_y[0]
+                zStart = merged_z[0]
+                xEnd = merged_x[-1]
+                yEnd = merged_y[-1]
+                zEnd = merged_z[-1]
+            pathInfo = path.distCalc((xStart, yStart, zStart), (xEnd, yEnd, zEnd))
+            if pathInfo.get('circular'):
+                print(f"Circular road detected — two possible paths (confidence {pathInfo['conf']:.3f}):")
+                print(f"  Clockwise distance:     {pathInfo['clockwise']['dist']:.3f}")
+                print(f"  Anticlockwise distance: {pathInfo['anticlockwise']['dist']:.3f}")
+            else:
+                print(f"Estimated distance is: {pathInfo['dist']:.3f}, with confidence {pathInfo['conf']:.3f}.")
             if args.verbose:
-                print(f"{options[i]} indexing")
+                print(f"""Starting projection:
+                Best Segment: {pathInfo['startProjection']['seg']},
+                Projection Error: {pathInfo['startProjection']['projErr']},
+                Confidence: {pathInfo['startProjection']['conf']:.3f}
+                """)
+                print(f"""Ending projection:
+                Best Segment: {pathInfo['endProjection']['seg']},
+                Projection Error: {pathInfo['endProjection']['projErr']},
+                Confidence: {pathInfo['endProjection']['conf']:.3f}
+                """)
+        else:
+            print("No items selected")
+    elif args.ident.upper() == "MRT":
+        newJson = updateJson(True, force=args.fetch, verbose=args.verbose)
+        with open(newJson, 'r') as f:
+            data = json.load(f)
+        valid = False
+        while not valid:
+            userLine = input("Enter the alphabet representing the line, for example Z for Zephyr: \n").upper()
             try:
-                markerList.append((data['roads.a']['lines'][options[i]]['x'], data['roads.a']['lines'][options[i]]['y'], data['roads.a']['lines'][options[i]]['z']))
-                # print(data['roads.a']['lines'][options[i]]['x'])
-                # print(markerList)
+                line = data[lineDict[userLine].lower()]
+                valid = True
             except:
-                markerList.append((data['roads.b']['lines'][options[i]]['x'], data['roads.b']['lines'][options[i]]['y'], data['roads.b']['lines'][options[i]]['z']))
-                # print(data['roads.b']['lines'][options[i]]['x'])
-                # print(markerList)
+                print("Invalid line.")
+                time.sleep(0.3)
+        markerLabels = getOptions("", data, True, userLine)
+        markerList = []
+        for i in range(len(markerLabels)):
+            markerList.append((line['lines'][markerLabels[i]]['x'], line['lines'][markerLabels[i]]['y'], line['lines'][markerLabels[i]]['z']))
         merged_x, merged_y, merged_z = merge_paths(markerList, args.verbose)
         path = PathTraverse(merged_x, merged_y, merged_z, args.verbose, args.vertical)
         valid = False
         while not valid:
-            print("Do you want to use custom junctions (start/end)? (Y/N) \n")
+            print("Do you want to use custom measurements (start/end)? (Y/N) \n")
             ans = input("").upper()
             if ans == "Y" or ans == "N":
                 valid = True
@@ -138,73 +252,80 @@ def main(argv: Optional[list[str]] = None) -> int:
                 print("Invalid response")
                 time.sleep(0.3)
 
-        if ans == "Y":
-            valid = False
-            while not valid:
-                print(f"Please enter coordinates of measured start in the format (x, y, z), or leave blank to start at first marker at ({merged_x[0]}, {merged_y[0]}, {merged_z[0]}). \n")
-                start = input("").strip()
-                if start == "":
-                    valid = True
-                else:
-                    parts = start.replace(',', ' ').split()
-                    if len(parts) != 3:
-                        print("Invalid coordinates")
-                        time.sleep(0.3)
-                        continue
-                    try:
-                        xStart, yStart, zStart = map(float, parts)
+            if ans == "Y":
+                valid = False
+                while not valid:
+                    print(f"Please enter coordinates of measured start in the format (x, y, z), or leave blank to start at first marker at ({merged_x[0]}, {merged_y[0]}, {merged_z[0]}). \n")
+                    start = input("").strip()
+                    if start == "":
                         valid = True
-                    except:
-                        print("Invalid coordinates")
-                        time.sleep(0.3)
-            if start == "":
+                    else:
+                        parts = start.replace(',', ' ').split()
+                        if len(parts) != 3:
+                            print("Invalid coordinates")
+                            time.sleep(0.3)
+                            continue
+                        try:
+                            xStart, yStart, zStart = map(float, parts)
+                            valid = True
+                        except:
+                            print("Invalid coordinates")
+                            time.sleep(0.3)
+                if start == "":
+                    xStart = merged_x[0]
+                    yStart = merged_y[0]
+                    zStart = merged_z[0]
+                valid = False
+                while not valid:
+                    print(f"Please enter coordinates of measured end in the format (x, y, z), or leave blank to end at last marker at ({merged_x[-1]}, {merged_y[-1]}, {merged_z[-1]}). \n")
+                    end = input("").strip()
+                    if end == "":
+                        valid = True
+                    else:
+                        parts2 = end.replace(',', ' ').split()
+                        if len(parts2) != 3:
+                            print("Invalid coordinates")
+                            time.sleep(0.3)
+                            continue
+                        try:
+                            xEnd, yEnd, zEnd = map(float, parts2)
+                            valid = True
+                        except:
+                            print("Invalid coordinates")
+                            time.sleep(0.3)
+                if end == "":
+                    xEnd = merged_x[-1]
+                    yEnd = merged_y[-1]
+                    zEnd = merged_z[-1]
+            if ans == "N":
                 xStart = merged_x[0]
                 yStart = merged_y[0]
                 zStart = merged_z[0]
-            valid = False
-            while not valid:
-                print(f"Please enter coordinates of measured end in the format (x, y, z), or leave blank to end at last marker at ({merged_x[-1]}, {merged_y[-1]}, {merged_z[-1]}). \n")
-                end = input("").strip()
-                if end == "":
-                    valid = True
-                else:
-                    parts2 = end.replace(',', ' ').split()
-                    if len(parts2) != 3:
-                        print("Invalid coordinates")
-                        time.sleep(0.3)
-                        continue
-                    try:
-                        xEnd, yEnd, zEnd = map(float, parts2)
-                        valid = True
-                    except:
-                        print("Invalid coordinates")
-                        time.sleep(0.3)
-            if end == "":
                 xEnd = merged_x[-1]
                 yEnd = merged_y[-1]
                 zEnd = merged_z[-1]
-        if ans == "N":
-            xStart = merged_x[0]
-            yStart = merged_y[0]
-            zStart = merged_z[0]
-            xEnd = merged_x[-1]
-            yEnd = merged_y[-1]
-            zEnd = merged_z[-1]
-        pathInfo = path.distCalc((xStart, yStart, zStart), (xEnd, yEnd, zEnd))
-        print(f"Estimated distance is: {pathInfo['dist']:.3f}, with confidence {pathInfo['conf']:.3f}.")
-        if args.verbose:
-            print(f"""Starting projection:
-            Best Segment: {pathInfo['startProjection']['seg']},
-            Projection Error: {pathInfo['startProjection']['projErr']},
-            Confidence: {pathInfo['startProjection']['conf']:.3f}
-            """)
-            print(f"""Ending projection:
-            Best Segment: {pathInfo['endProjection']['seg']},
-            Projection Error: {pathInfo['endProjection']['projErr']},
-            Confidence: {pathInfo['endProjection']['conf']:.3f}
-            """)
-    else:
-        print("No items selected")
+            pathInfo = path.distCalc((xStart, yStart, zStart), (xEnd, yEnd, zEnd))
+            if pathInfo.get('circular'):
+                print(f"Circular road detected — two possible paths (confidence {pathInfo['conf']:.3f}):")
+                print(f"  Clockwise distance:     {pathInfo['clockwise']['dist']:.3f}")
+                print(f"  Anticlockwise distance: {pathInfo['anticlockwise']['dist']:.3f}")
+            else:
+                print(f"Estimated distance is: {pathInfo['dist']:.3f}, with confidence {pathInfo['conf']:.3f}.")
+            if args.verbose:
+                print(f"""Starting projection:
+                Best Segment: {pathInfo['startProjection']['seg']},
+                Projection Error: {pathInfo['startProjection']['projErr']},
+                Confidence: {pathInfo['startProjection']['conf']:.3f}
+                """)
+                print(f"""Ending projection:
+                Best Segment: {pathInfo['endProjection']['seg']},
+                Projection Error: {pathInfo['endProjection']['projErr']},
+                Confidence: {pathInfo['endProjection']['conf']:.3f}
+                """)
+
+
+
+
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -13,11 +13,14 @@ output = ".\\json\\"+str(int(datetime.datetime.now(datetime.UTC).timestamp()))+"
 def fetchJson(url, output):
     headers = {"Accept": "application/json, */*;q=0.1"}
     request = Request(url, headers=headers)
-    response = urlopen(request)
+    try:
+        response = urlopen(request)
+    except:
+        response = urlopen(url, context=ssl._create_unverified_context())
     data = json.loads(response.read().decode("utf-8"))
     return data
 
-def updateJson(force=False, verbose=True):
+def updateJson(fetchMRT:bool, force=False, verbose=True):
     # default
     bypass = False
     latestEpoch = int(datetime.datetime.now(datetime.UTC).timestamp())
@@ -42,11 +45,13 @@ def updateJson(force=False, verbose=True):
 
     if latestEpoch+86400 < int(datetime.datetime.now(datetime.UTC).timestamp()) or force:
         print("Fetching new JSON data")
-        data = fetchJson(url, output).get("sets", {})
-        #TODO: add MRT line support and marker support
-        aRoads = data.get("roads.a", {})
-        bRoads = data.get("roads.b", {})
-        data = {"roads.a": aRoads, "roads.b": bRoads}
+        if not fetchMRT:
+            data = fetchJson(url, output).get("sets", {})
+            aRoads = data.get("roads.a", {})
+            bRoads = data.get("roads.b", {})
+            data = {"roads.a": aRoads, "roads.b": bRoads}
+        elif fetchMRT:
+            data = fetchJson(url, output).get("sets", {})
         with open(output, "w") as f:
             json.dump(data, f, indent=2)
         if verbose:
@@ -56,4 +61,5 @@ def updateJson(force=False, verbose=True):
         print("Using cached JSON data, use --fetch to force update")
         return ".\\"+str(latestJson)
 
-
+if __name__ == "__main__":
+    updateJson(True, force=True)
