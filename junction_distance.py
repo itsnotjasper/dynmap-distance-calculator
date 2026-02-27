@@ -204,7 +204,12 @@ def main(argv: Optional[list[str]] = None) -> int:
                 yEnd = merged_y[-1]
                 zEnd = merged_z[-1]
             pathInfo = path.distCalc((xStart, yStart, zStart), (xEnd, yEnd, zEnd))
-            print(f"Estimated distance is: {pathInfo['dist']:.3f}, with confidence {pathInfo['conf']:.3f}.")
+            if pathInfo.get('circular'):
+                print(f"Circular road detected — two possible paths (confidence {pathInfo['conf']:.3f}):")
+                print(f"  Clockwise distance:     {pathInfo['clockwise']['dist']:.3f}")
+                print(f"  Anticlockwise distance: {pathInfo['anticlockwise']['dist']:.3f}")
+            else:
+                print(f"Estimated distance is: {pathInfo['dist']:.3f}, with confidence {pathInfo['conf']:.3f}.")
             if args.verbose:
                 print(f"""Starting projection:
                 Best Segment: {pathInfo['startProjection']['seg']},
@@ -300,7 +305,12 @@ def main(argv: Optional[list[str]] = None) -> int:
                 yEnd = merged_y[-1]
                 zEnd = merged_z[-1]
             pathInfo = path.distCalc((xStart, yStart, zStart), (xEnd, yEnd, zEnd))
-            print(f"Estimated distance is: {pathInfo['dist']:.3f}, with confidence {pathInfo['conf']:.3f}.")
+            if pathInfo.get('circular'):
+                print(f"Circular road detected — two possible paths (confidence {pathInfo['conf']:.3f}):")
+                print(f"  Clockwise distance:     {pathInfo['clockwise']['dist']:.3f}")
+                print(f"  Anticlockwise distance: {pathInfo['anticlockwise']['dist']:.3f}")
+            else:
+                print(f"Estimated distance is: {pathInfo['dist']:.3f}, with confidence {pathInfo['conf']:.3f}.")
             if args.verbose:
                 print(f"""Starting projection:
                 Best Segment: {pathInfo['startProjection']['seg']},
