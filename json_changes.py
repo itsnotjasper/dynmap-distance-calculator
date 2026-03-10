@@ -22,22 +22,26 @@ def fetchJson(url, output):
 
 def updateJson(fetchMRT:bool, force=False, verbose=True):
     # default
+    suffix = "mrt" if fetchMRT else "roads"
     bypass = False
     latestEpoch = int(datetime.datetime.now(datetime.UTC).timestamp())
+    glob_pattern = f"*_markers_{suffix}.json"
+    output = f".\\json\\{int(datetime.datetime.now(datetime.UTC).timestamp())}_markers_{suffix}.json"
+
     if not Path('./json/').exists():
         Path('./json/').mkdir(parents=True, exist_ok=True)
         bypass=True
         force=True
         if verbose:
             print(f"./json/ does not exist, directory created and fetching new data")
-    elif not any(Path("./json").glob("*_markers.json")):
+    elif not any(Path("./json").glob(glob_pattern)):
         bypass=True
         force=True
         if verbose:
             print(f"No existing JSON files found in ./json/, fetching new data")
 
     if not bypass or not force:
-        latestJson = max(Path("./json").glob("*_markers.json"), key=lambda p: int(p.stem.split("_")[0]))
+        latestJson = max(Path("./json").glob(glob_pattern), key=lambda p: int(p.stem.split("_")[0]))
         latestEpoch = int(latestJson.stem.split("_")[0])
         if verbose:
             print(f"Latest JSON: {latestJson}")
