@@ -26,7 +26,8 @@ def getOptions(search, data, MRTQuery:bool, MRTline=None):
             options.append(i)
         for j in data['roads.b']['lines']:
             options.append(j)
-        matches = [match for match in options if search.lower() in match.lower()]
+        pattern = re.compile(re.escape(search) + r'(?!\d)', re.IGNORECASE)
+        matches = [match for match in options if pattern.search(match)]
         return sorted(matches) if matches else [f"No matches for {search}"]
     else:
         options = []
@@ -46,7 +47,7 @@ def selector(stdscr, options, data):
         curses.init_pair(1, curses.COLOR_BLACK, curses.COLOR_GREEN)
         
     current_row = 0
-    selected = [False] * len(options)
+    selected = [True] * len(options)
         
     if options and options[0].startswith("No matches for"):
         selectable = False
