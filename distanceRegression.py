@@ -246,15 +246,18 @@ class PathTraverse:
         if interval <= 0:
             raise ValueError("interval must be positive")
         forward = start_dist <= end_dist
-        lo, hi = (start_dist, end_dist) if forward else (end_dist, start_dist)
         points = []
-        d = lo
-        while d < hi - 1e-9:
-            points.append(self.coords_at_distance(d))
-            d += interval
-        points.append(self.coords_at_distance(hi))
-        if not forward:
-            points.reverse()
+        if forward:
+            d = start_dist
+            while d < end_dist - 1e-9:
+                points.append(self.coords_at_distance(d))
+                d += interval
+        else:
+            d = start_dist
+            while d > end_dist + 1e-9:
+                points.append(self.coords_at_distance(d))
+                d -= interval
+        points.append(self.coords_at_distance(end_dist))
         return points
 
         # Non-circular: original behaviour

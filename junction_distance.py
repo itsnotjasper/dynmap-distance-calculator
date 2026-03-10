@@ -238,17 +238,28 @@ def main(argv: Optional[list[str]] = None) -> int:
                         adj_end = end_dist + total if end_dist < start_dist else end_dist - total
                         wps = path.waypoints(start_dist, adj_end, args.interval)
                 else:
-                    wps = path.waypoints(start_dist, end_dist, args.interval)
-                header = f"Waypoints every {args.interval} blocks ({len(wps)} point{'s' if len(wps) != 1 else ''}):"
-                out_lines = [header]
-                for idx, (wx, wy, wz) in enumerate(wps):
-                    if idx == 0:
-                        label = "start"
-                    elif idx == len(wps) - 1:
-                        label = "end"
-                    else:
-                        label = f"{idx * args.interval:.1f}"
-                    out_lines.append(f"  [{label:>8}]  x={wx:>10.3f},  y={wy:>8.3f},  z={wz:>10.3f}")
+                    wps_fwd = path.waypoints(start_dist, end_dist, args.interval)
+                    wps_bwd = path.waypoints(end_dist, start_dist, args.interval)
+                def fmt_waypoints(wps):
+                    lines = []
+                    for idx, (wx, wy, wz) in enumerate(wps):
+                        if idx == 0:
+                            label = "start"
+                        elif idx == len(wps) - 1:
+                            label = "end"
+                        else:
+                            label = f"{idx * args.interval:.1f}"
+                        lines.append(f"  [{label:>8}]  x={wx:>10.3f},  y={wy:>8.3f},  z={wz:>10.3f}")
+                    return lines
+
+                if pathInfo.get('circular'):
+                    out_lines = [f"Waypoints every {args.interval} blocks ({len(wps)} point{'s' if len(wps) != 1 else ''}):", ""]
+                    out_lines += fmt_waypoints(wps)
+                else:
+                    out_lines  = [f"Forward waypoints every {args.interval} blocks ({len(wps_fwd)} point{'s' if len(wps_fwd) != 1 else ''}):", ""]
+                    out_lines += fmt_waypoints(wps_fwd)
+                    out_lines += ["", f"Backward waypoints every {args.interval} blocks ({len(wps_bwd)} point{'s' if len(wps_bwd) != 1 else ''}):", ""]
+                    out_lines += fmt_waypoints(wps_bwd)
                 output_text = "\n".join(out_lines)
                 print(f"\n{output_text}")
                 Path("./outputs").mkdir(parents=True, exist_ok=True)
@@ -269,8 +280,11 @@ def main(argv: Optional[list[str]] = None) -> int:
             try:
                 line = data[lineDict[userLine].lower()]
                 valid = True
-            except:
-                print("Invalid line.")
+            except KeyError:
+                print(f"Key '{lineDict[userLine].lower()}' not found. Available keys: {list(data.keys())}")
+                time.sleep(2)
+            except Exception as e:
+                print(f"Invalid line: {e}")
                 time.sleep(0.3)
         markerLabels = getOptions("", data, True, userLine)
         markerList = []
