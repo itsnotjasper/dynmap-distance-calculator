@@ -112,6 +112,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     parser.add_argument("-f", "--fetch", "--force", action="store_true", help="Force fetch new JSON data")
     parser.add_argument("--verbose", action="store_true", help="Verbose output")
     parser.add_argument("-y", "--vertical", action="store_true", help="Takes into consideration y-axis")
+    parser.add_argument("-n", "--interval", type=float, default=None, metavar="N",
+                        help="Print (x, y, z) coordinates every N blocks along the path")
     args = parser.parse_args(argv)
     if args.ident.upper() != "MRT":  
         newJson = updateJson(False, force=args.fetch, verbose=args.verbose)
@@ -221,6 +223,39 @@ def main(argv: Optional[list[str]] = None) -> int:
                 Projection Error: {pathInfo['endProjection']['projErr']},
                 Confidence: {pathInfo['endProjection']['conf']:.3f}
                 """)
+            if args.interval is not None:
+                start_dist = pathInfo['startProjection']['pathDist']
+                end_dist   = pathInfo['endProjection']['pathDist']
+                if pathInfo.get('circular'):
+                    total    = path.cum_distances[-1]
+                    forward  = abs(end_dist - start_dist)
+                    backward = total - forward
+                    if forward <= backward:
+                        wps = path.waypoints(start_dist, end_dist, args.interval)
+                    else:
+                        # Walk the long way around the loop
+                        adj_end = end_dist + total if end_dist < start_dist else end_dist - total
+                        wps = path.waypoints(start_dist, adj_end, args.interval)
+                else:
+                    wps = path.waypoints(start_dist, end_dist, args.interval)
+                header = f"Waypoints every {args.interval} blocks ({len(wps)} point{'s' if len(wps) != 1 else ''}):"
+                out_lines = [header]
+                for idx, (wx, wy, wz) in enumerate(wps):
+                    if idx == 0:
+                        label = "start"
+                    elif idx == len(wps) - 1:
+                        label = "end"
+                    else:
+                        label = f"{idx * args.interval:.1f}"
+                    out_lines.append(f"  [{label:>8}]  x={wx:>10.3f},  y={wy:>8.3f},  z={wz:>10.3f}")
+                output_text = "\n".join(out_lines)
+                print(f"\n{output_text}")
+                Path("./outputs").mkdir(parents=True, exist_ok=True)
+                epoch = int(datetime.datetime.now(datetime.UTC).timestamp())
+                out_path = f"./outputs/{args.ident}_{epoch}.txt"
+                with open(out_path, "w") as f:
+                    f.write(output_text + "\n")
+                print(f"Waypoints saved to {out_path}")
         else:
             print("No items selected")
     elif args.ident.upper() == "MRT":

@@ -217,3 +217,62 @@ class PathTraverse:
                 'endProjection': proj_start,
                 'conf': conf
             }
+
+    def coords_at_distance(self, d: float) -> Tuple[float, float, float]:
+        """Return the interpolated (x, y, z) at a given cumulative path distance."""
+        d = max(0.0, min(d, self.cum_distances[-1]))
+        # Find the segment containing distance d
+        lo, hi = 0, len(self.cum_distances) - 2
+        while lo < hi:
+            mid = (lo + hi) // 2
+            if self.cum_distances[mid + 1] < d:
+                lo = mid + 1
+            else:
+                hi = mid
+        i = lo
+        seg_len = self.cum_distances[i + 1] - self.cum_distances[i]
+        t = 0.0 if seg_len < 1e-12 else (d - self.cum_distances[i]) / seg_len
+        x = self.x[i] + t * (self.x[i + 1] - self.x[i])
+        y = self.y[i] + t * (self.y[i + 1] - self.y[i])
+        z = self.z[i] + t * (self.z[i + 1] - self.z[i])
+        return (x, y, z)
+
+    def waypoints(self, start_dist: float, end_dist: float, interval: float) -> List[Tuple[float, float, float]]:
+        """
+        Return a list of (x, y, z) coordinates sampled every `interval` blocks
+        along the path between start_dist and end_dist (inclusive).
+        The start and end points are always included.
+        """
+        if interval <= 0:
+            raise ValueError("interval must be positive")
+        forward = start_dist <= end_dist
+        lo, hi = (start_dist, end_dist) if forward else (end_dist, start_dist)
+        points = []
+        d = lo
+        while d < hi - 1e-9:
+            points.append(self.coords_at_distance(d))
+            d += interval
+        points.append(self.coords_at_distance(hi))
+        if not forward:
+            points.reverse()
+        return points
+
+        # Non-circular: original behaviour
+        if dist_start < dist_end:
+            return {
+                'circular': False,
+                'dist': dist_end - dist_start,
+                'direction': 1,
+                'startProjection': proj_start,
+                'endProjection': proj_end,
+                'conf': conf
+            }
+        else:
+            return {
+                'circular': False,
+                'dist': dist_start - dist_end,
+                'direction': -1,
+                'startProjection': proj_end,
+                'endProjection': proj_start,
+                'conf': conf
+            }
